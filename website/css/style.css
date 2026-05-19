@@ -1099,6 +1099,24 @@ samp {
     font-size: 0.85rem;
 }
 
+.mobile-shout {
+    grid-column: 1 / -1;
+    margin: 0.2rem 0 0;
+    color: var(--muted);
+    font-size: 0.82rem;
+    text-align: center;
+}
+
+.mobile-shout a {
+    color: var(--ink-soft);
+    border-bottom: 1px solid var(--line-strong);
+}
+
+.mobile-shout a:hover {
+    color: var(--accent);
+    border-color: var(--accent);
+}
+
 .api-section {
     align-items: stretch;
 }
