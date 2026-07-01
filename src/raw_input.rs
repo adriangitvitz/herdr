@@ -177,10 +177,20 @@ pub(crate) struct RawInputByteFramer {
     discarded_tail_bytes: usize,
     host_color_replies_awaited: u8,
     held_pending_color_esc: bool,
+    held_incomplete_color_flushes: u8,
     host_color_scheme_change_tracking: bool,
 }
 
 const HOST_COLOR_QUERY_REPLIES: u8 = 2;
+
+/// Idle flushes an unterminated OSC 10/11 reply is held before it is dropped.
+///
+/// A genuinely split reply completes via a later read, not via this branch, so
+/// any nonzero bound preserves it; the bound only fires when bytes pile up
+/// behind a reply whose terminator never arrives. A few flushes of grace cover
+/// a reply fragmented across slow SSH reads while still bounding the freeze so
+/// hosts that never finish the reply (e.g. ChromeOS hterm) cannot wedge input.
+const MAX_HELD_INCOMPLETE_COLOR_FLUSHES: u8 = 3;
 
 impl RawInputByteFramer {
     pub(crate) fn push(&mut self, data: &[u8]) -> Vec<Vec<u8>> {
@@ -243,10 +253,22 @@ impl RawInputByteFramer {
         }
 
         if starts_with_incomplete_default_color_response(&self.buffer) {
-            tracing::trace!(
+            if self.held_incomplete_color_flushes < MAX_HELD_INCOMPLETE_COLOR_FLUSHES {
+                self.held_incomplete_color_flushes += 1;
+                tracing::trace!(
+                    len = self.buffer.len(),
+                    "waiting for host color response terminator"
+                );
+                return chunks;
+            }
+            // The terminator never arrived (e.g. ChromeOS hterm over SSH); drop
+            // the wedged reply so input buffered behind it can flow again.
+            tracing::debug!(
                 len = self.buffer.len(),
-                "waiting for host color response terminator"
+                "dropping incomplete host color response after input timeout"
             );
+            self.held_incomplete_color_flushes = 0;
+            self.buffer.clear();
             return chunks;
         }
 
@@ -335,6 +357,7 @@ impl RawInputByteFramer {
             };
             if matches!(event, RawInputEvent::HostDefaultColor { .. }) {
                 self.host_color_replies_awaited = self.host_color_replies_awaited.saturating_sub(1);
+                self.held_incomplete_color_flushes = 0;
             } else if self.host_color_scheme_change_tracking
                 && matches!(event, RawInputEvent::HostColorSchemeChanged(_))
             {
@@ -2052,5 +2075,51 @@ mod tests {
         // Window closed: a later lone Escape flushes immediately.
         assert!(framer.push(b"\x1b").is_empty());
         assert_eq!(framer.flush_timeout(), vec![b"\x1b".to_vec()]);
+    }
+
+    #[test]
+    fn drops_unterminated_host_color_reply_and_recovers_input_after_idle_flushes() {
+        // ChromeOS hterm over SSH: the host begins an OSC 10/11 color reply but
+        // never sends the terminator. Keystrokes typed afterwards queue up
+        // behind the partial reply. Without a bound this wedges input forever.
+        let mut framer = RawInputByteFramer::default();
+        framer.host_color_query_sent();
+
+        // Partial reply, then the user types: nothing surfaces yet.
+        assert!(framer.push(b"\x1b]11;rgb:2828").is_empty());
+        assert!(framer.push(b"a").is_empty());
+
+        // Each idle flush holds the wedged buffer, up to the bound.
+        for _ in 0..MAX_HELD_INCOMPLETE_COLOR_FLUSHES {
+            assert!(framer.flush_timeout().is_empty());
+            assert!(framer.has_pending_input());
+        }
+
+        // The terminator never arrived: the next idle flush drops the wedge.
+        assert!(framer.flush_timeout().is_empty());
+        assert!(!framer.has_pending_input());
+
+        // Input flows again afterwards.
+        assert_eq!(framer.push(b"b"), vec![b"b".to_vec()]);
+    }
+
+    #[test]
+    fn keeps_holding_split_host_color_reply_until_it_completes() {
+        // A genuinely split reply must still stitch back together: it completes
+        // via a later read, not via the timeout-drop branch.
+        let mut framer = RawInputByteFramer::default();
+        framer.host_color_query_sent();
+
+        assert!(framer.push(b"\x1b]11;rgb:2828").is_empty());
+        // An idle flush before the rest arrives holds, it does not drop.
+        assert!(framer.flush_timeout().is_empty());
+
+        let chunks = framer.push(b"/2a2a/3636\x07");
+        assert_eq!(chunks, vec![b"\x1b]11;rgb:2828/2a2a/3636\x07".to_vec()]);
+
+        // The hold budget reset, so a fresh unterminated reply gets full grace.
+        assert!(framer.push(b"\x1b]11;rgb:1111").is_empty());
+        assert!(framer.flush_timeout().is_empty());
+        assert!(framer.has_pending_input());
     }
 }
