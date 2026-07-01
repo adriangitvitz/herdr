@@ -65,16 +65,34 @@ impl ModifyOtherKeysMode {
     }
 }
 
-pub fn host_modify_other_keys_mode(
+pub fn host_modify_other_keys_mode() -> Option<ModifyOtherKeysMode> {
+    #[cfg(windows)]
+    let alacritty_window_id = std::env::var_os("ALACRITTY_WINDOW_ID").is_some();
+    #[cfg(not(windows))]
+    let alacritty_window_id = false;
+
+    host_modify_other_keys_mode_for_env(
+        std::env::var("TMUX").is_ok(),
+        std::env::var("TERM_PROGRAM").ok().as_deref(),
+        std::env::var_os("WEZTERM_PANE").is_some(),
+        alacritty_window_id,
+    )
+}
+
+fn host_modify_other_keys_mode_for_env(
     in_tmux: bool,
     term_program: Option<&str>,
     wezterm_pane: bool,
+    alacritty_window_id: bool,
 ) -> Option<ModifyOtherKeysMode> {
     if in_tmux {
         return Some(ModifyOtherKeysMode::Mode2);
     }
 
-    if wezterm_pane || term_program.is_some_and(|program| program.eq_ignore_ascii_case("wezterm")) {
+    if wezterm_pane
+        || alacritty_window_id
+        || term_program.is_some_and(|program| program.eq_ignore_ascii_case("wezterm"))
+    {
         return Some(ModifyOtherKeysMode::Mode1);
     }
 
@@ -94,6 +112,10 @@ impl KeyboardProtocol {
         } else {
             Self::Kitty { flags }
         }
+    }
+
+    pub(crate) fn reports_event_types(self) -> bool {
+        matches!(self, Self::Kitty { flags } if flags & 0b0000_0010 != 0)
     }
 }
 
@@ -155,7 +177,7 @@ mod tests {
     #[test]
     fn modify_other_keys_mode_is_enabled_for_tmux() {
         assert_eq!(
-            host_modify_other_keys_mode(true, Some("WezTerm"), true),
+            host_modify_other_keys_mode_for_env(true, Some("WezTerm"), true, true),
             Some(ModifyOtherKeysMode::Mode2)
         );
     }
@@ -163,11 +185,19 @@ mod tests {
     #[test]
     fn modify_other_keys_mode_is_enabled_for_wezterm_hosts() {
         assert_eq!(
-            host_modify_other_keys_mode(false, Some("WezTerm"), false),
+            host_modify_other_keys_mode_for_env(false, Some("WezTerm"), false, false),
             Some(ModifyOtherKeysMode::Mode1)
         );
         assert_eq!(
-            host_modify_other_keys_mode(false, None, true),
+            host_modify_other_keys_mode_for_env(false, None, true, false),
+            Some(ModifyOtherKeysMode::Mode1)
+        );
+    }
+
+    #[test]
+    fn modify_other_keys_mode_is_enabled_for_alacritty_hosts() {
+        assert_eq!(
+            host_modify_other_keys_mode_for_env(false, None, false, true),
             Some(ModifyOtherKeysMode::Mode1)
         );
     }
@@ -175,9 +205,12 @@ mod tests {
     #[test]
     fn modify_other_keys_mode_is_not_enabled_for_unknown_hosts() {
         assert_eq!(
-            host_modify_other_keys_mode(false, Some("ghostty"), false),
+            host_modify_other_keys_mode_for_env(false, Some("ghostty"), false, false),
             None
         );
-        assert_eq!(host_modify_other_keys_mode(false, None, false), None);
+        assert_eq!(
+            host_modify_other_keys_mode_for_env(false, None, false, false),
+            None
+        );
     }
 }

@@ -258,7 +258,10 @@ impl AppState {
         })
     }
 
-    fn pane_focus_target_indices(&self, target: &PaneFocusTarget) -> Option<(usize, usize)> {
+    pub(crate) fn pane_focus_target_indices(
+        &self,
+        target: &PaneFocusTarget,
+    ) -> Option<(usize, usize)> {
         let ws_idx = self
             .workspaces
             .iter()
@@ -1067,7 +1070,7 @@ impl AppState {
             return;
         }
 
-        let row_range = crate::ui::mobile_switcher_workspace_doc_range(idx);
+        let row_range = crate::ui::mobile_switcher_workspace_doc_range(self, idx);
         let visible_start = self.mobile_switcher_scroll;
         let visible_end = visible_start.saturating_add(viewport.height as usize);
         if row_range.start < visible_start {
@@ -1122,7 +1125,14 @@ impl AppState {
     }
 
     pub(crate) fn visible_workspace_order(&self) -> Vec<usize> {
-        let order = crate::ui::workspace_list_entries(self)
+        // Mobile always shows the worktree tree expanded, so its visible order
+        // must ignore collapse state to match what the switcher renders.
+        let entries = if self.view.layout == ViewLayout::Mobile {
+            crate::ui::workspace_list_entries_expanded(self)
+        } else {
+            crate::ui::workspace_list_entries(self)
+        };
+        let order = entries
             .into_iter()
             .map(|entry| match entry {
                 crate::ui::WorkspaceListEntry::Workspace { ws_idx, .. } => ws_idx,
@@ -1183,9 +1193,18 @@ impl AppState {
         self.switch_workspace(prev);
     }
 
-    pub fn move_workspace(&mut self, source_idx: usize, insert_idx: usize) {
+    pub fn move_workspace(&mut self, source_idx: usize, insert_idx: usize) -> bool {
         if source_idx >= self.workspaces.len() || insert_idx > self.workspaces.len() {
-            return;
+            return false;
+        }
+
+        let target_idx = if source_idx < insert_idx {
+            insert_idx - 1
+        } else {
+            insert_idx
+        };
+        if source_idx == target_idx {
+            return false;
         }
 
         self.mark_session_dirty();
@@ -1197,12 +1216,6 @@ impl AppState {
             .map(|workspace| workspace.id.clone());
 
         let workspace = self.workspaces.remove(source_idx);
-        let target_idx = if source_idx < insert_idx {
-            insert_idx.saturating_sub(1)
-        } else {
-            insert_idx
-        }
-        .min(self.workspaces.len());
         self.workspaces.insert(target_idx, workspace);
 
         self.active = active_id.and_then(|id| self.workspaces.iter().position(|ws| ws.id == id));
@@ -1210,6 +1223,7 @@ impl AppState {
             .and_then(|id| self.workspaces.iter().position(|ws| ws.id == id))
             .unwrap_or(0);
         self.ensure_workspace_visible(self.selected);
+        true
     }
 
     pub fn scroll_tabs_left(&mut self) {
@@ -1222,16 +1236,6 @@ impl AppState {
         self.tab_scroll_follow_active = false;
         self.tab_scroll = self.tab_scroll.saturating_add(1);
         self.refresh_tab_bar_view();
-    }
-
-    pub fn move_tab(&mut self, source_idx: usize, insert_idx: usize) {
-        if let Some(ws) = self.active.and_then(|i| self.workspaces.get_mut(i)) {
-            if ws.move_tab(source_idx, insert_idx) {
-                self.mark_session_dirty();
-                self.tab_scroll_follow_active = true;
-                self.refresh_tab_bar_view();
-            }
-        }
     }
 
     pub fn next_tab(&mut self) {
@@ -1308,7 +1312,7 @@ impl AppState {
         self.focus_agent_entry(target_idx);
     }
 
-    fn ensure_agent_panel_entry_visible(&mut self, idx: usize) {
+    pub(crate) fn ensure_agent_panel_entry_visible(&mut self, idx: usize) {
         if self.sidebar_collapsed {
             return;
         }
@@ -1479,7 +1483,7 @@ impl AppState {
         }
     }
 
-    fn refresh_tab_bar_view(&mut self) {
+    pub(crate) fn refresh_tab_bar_view(&mut self) {
         let area = self.view.tab_bar_rect;
         let Some(ws) = self.active.and_then(|idx| self.workspaces.get(idx)) else {
             self.tab_scroll = 0;
@@ -1587,6 +1591,7 @@ impl AppState {
         }
     }
 
+    #[cfg(test)]
     pub fn resize_pane(&mut self, direction: NavDirection) {
         if let Some(first) = self.view.pane_infos.first() {
             let area = self

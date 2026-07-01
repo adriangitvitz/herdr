@@ -147,7 +147,13 @@ function Test-FileDigest {
         return
     }
 
-    $actual = (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
+    $sha256 = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        $bytes = [System.IO.File]::ReadAllBytes($Path)
+        $actual = [System.BitConverter]::ToString($sha256.ComputeHash($bytes)).Replace("-", "").ToLowerInvariant()
+    } finally {
+        $sha256.Dispose()
+    }
     if ($actual -ne $ExpectedDigest.ToLowerInvariant()) {
         throw "Downloaded Herdr checksum did not match. Expected $ExpectedDigest but got $actual."
     }

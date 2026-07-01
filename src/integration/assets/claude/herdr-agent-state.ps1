@@ -2,7 +2,7 @@
 # managed by herdr; reinstalling or updating the integration overwrites this file.
 # add custom hooks beside this file instead of editing it.
 # HERDR_INTEGRATION_ID=claude
-# HERDR_INTEGRATION_VERSION=6
+# HERDR_INTEGRATION_VERSION=7
 
 param([string]$Action = "")
 
@@ -17,6 +17,7 @@ try {
     exit 0
 }
 
+if (-not [string]::IsNullOrWhiteSpace($payload.agent_id)) { exit 0 }
 if ($payload.hook_event_name -eq "SubagentStop") { exit 0 }
 
 $sessionId = $payload.session_id

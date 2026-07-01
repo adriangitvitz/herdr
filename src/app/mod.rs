@@ -14,6 +14,7 @@ mod creation;
 mod ids;
 mod input;
 mod runtime;
+mod runtime_mutations;
 mod session;
 pub mod state;
 mod terminal_targets;
@@ -588,6 +589,7 @@ impl App {
             sidebar_width_source,
             sidebar_width_auto: false,
             sidebar_collapsed: false,
+            sidebar_collapsed_mode: config.ui.sidebar_collapsed_mode,
             sidebar_section_split,
             agent_panel_sort,
             next_agent_state_change_seq: 0,
@@ -598,7 +600,10 @@ impl App {
             mouse_scroll_lines: config.ui.mouse_scroll_lines(),
             confirm_close: config.ui.confirm_close,
             prompt_new_tab_name: config.ui.prompt_new_tab_name,
+            pane_borders: config.ui.pane_borders,
+            pane_gaps: config.ui.pane_gaps,
             show_agent_labels_on_pane_borders: config.ui.show_agent_labels_on_pane_borders,
+            hide_tab_bar_when_single_tab: config.ui.hide_tab_bar_when_single_tab,
             pane_history_persistence: config.experimental.pane_history,
             reveal_hidden_cursor_for_cjk_ime: config.experimental.reveal_hidden_cursor_for_cjk_ime,
             cjk_ime_agent_filter_configured: !config.experimental.cjk_ime_agents.is_empty(),
@@ -882,13 +887,33 @@ impl App {
 
             if self.state.request_new_workspace {
                 self.state.request_new_workspace = false;
-                self.create_workspace();
+                self.dispatch_runtime_mutation(
+                    "tui.workspace.create",
+                    crate::api::schema::Method::WorkspaceCreate(
+                        crate::api::schema::WorkspaceCreateParams {
+                            cwd: None,
+                            focus: true,
+                            label: None,
+                            env: Default::default(),
+                        },
+                    ),
+                );
                 needs_render = true;
             }
 
             if self.state.request_new_tab {
                 self.state.request_new_tab = false;
-                self.create_tab();
+                let label = self.state.requested_new_tab_name.take();
+                self.dispatch_runtime_mutation(
+                    "tui.tab.create",
+                    crate::api::schema::Method::TabCreate(crate::api::schema::TabCreateParams {
+                        workspace_id: None,
+                        cwd: None,
+                        focus: true,
+                        label,
+                        env: Default::default(),
+                    }),
+                );
                 needs_render = true;
             }
 
@@ -903,10 +928,17 @@ impl App {
             }
 
             if let Some(cwd) = self.state.request_new_workspace_cwd.take() {
-                if let Err(err) = self.create_workspace_with_events(cwd, true) {
-                    tracing::error!(err = %err, "failed to create workspace at requested cwd");
-                    self.state.mode = Mode::Navigate;
-                }
+                self.dispatch_runtime_mutation(
+                    "tui.workspace.create_cwd",
+                    crate::api::schema::Method::WorkspaceCreate(
+                        crate::api::schema::WorkspaceCreateParams {
+                            cwd: Some(cwd.display().to_string()),
+                            focus: true,
+                            label: None,
+                            env: Default::default(),
+                        },
+                    ),
+                );
                 needs_render = true;
             }
 
@@ -917,19 +949,19 @@ impl App {
 
             if self.state.request_submit_worktree_create {
                 self.state.request_submit_worktree_create = false;
-                self.start_worktree_add();
+                self.submit_worktree_create_via_api();
                 needs_render = true;
             }
 
             if self.state.request_submit_worktree_open {
                 self.state.request_submit_worktree_open = false;
-                self.open_selected_existing_worktree();
+                self.submit_worktree_open_via_api();
                 needs_render = true;
             }
 
             if self.state.request_submit_worktree_remove {
                 self.state.request_submit_worktree_remove = false;
-                self.start_worktree_remove();
+                self.submit_worktree_remove_via_api();
                 needs_render = true;
             }
 
@@ -1270,11 +1302,12 @@ impl App {
             |section: &str| invalid_sections.iter().any(|invalid| invalid == section);
 
         if !invalid_section("keys") {
-            match config.live_keybinds() {
-                Ok(live) => {
+            match config.live_keybinds_with_diagnostics() {
+                Ok((live, keybind_diagnostics)) => {
                     self.state.prefix_code = live.prefix.0;
                     self.state.prefix_mods = live.prefix.1;
                     self.state.keybinds = live.keybinds;
+                    diagnostics.extend(keybind_diagnostics);
                 }
                 Err(keybind_diagnostics) => {
                     diagnostics.extend(
@@ -1310,6 +1343,7 @@ impl App {
                 }
                 self.state.sidebar_min_width = config.ui.sidebar_min_width;
                 self.state.sidebar_max_width = config.ui.sidebar_max_width;
+                self.state.sidebar_collapsed_mode = config.ui.sidebar_collapsed_mode;
                 self.state.mobile_width_threshold = config.ui.mobile_width_threshold;
                 // Re-clamp the live width to the new bounds. No source guard — bounds
                 // always apply, including to widths owned by Persisted or Manual.
@@ -1327,8 +1361,11 @@ impl App {
                     config.ui.right_click_passthrough_modifiers();
                 self.state.confirm_close = config.ui.confirm_close;
                 self.state.prompt_new_tab_name = config.ui.prompt_new_tab_name;
+                self.state.pane_borders = config.ui.pane_borders;
+                self.state.pane_gaps = config.ui.pane_gaps;
                 self.state.show_agent_labels_on_pane_borders =
                     config.ui.show_agent_labels_on_pane_borders;
+                self.state.hide_tab_bar_when_single_tab = config.ui.hide_tab_bar_when_single_tab;
                 self.state.agent_panel_sort =
                     agent_panel_sort_from_config(config.ui.agent_panel_sort);
                 self.state.agent_panel_scroll = 0;
@@ -1587,7 +1624,7 @@ impl App {
                 self.handle_copy_mode_key(key);
             }
             Mode::RenameWorkspace | Mode::RenameTab | Mode::RenamePane => {
-                input::handle_rename_key(&mut self.state, key_event);
+                self.handle_rename_key_via_api(key_event);
             }
             Mode::NewLinkedWorktree => {
                 self.handle_worktree_create_key(key_event);
@@ -1599,17 +1636,13 @@ impl App {
                 self.handle_worktree_remove_key(key_event);
             }
             Mode::Resize => {
-                input::handle_resize_key(&mut self.state, key);
+                self.handle_resize_key_via_api(key);
             }
             Mode::ConfirmClose => {
-                input::handle_confirm_close_key(&mut self.state, key_event);
+                self.handle_confirm_close_key_via_api(key_event);
             }
             Mode::ContextMenu => {
-                input::handle_context_menu_key(
-                    &mut self.state,
-                    &mut self.terminal_runtimes,
-                    key_event,
-                );
+                self.handle_context_menu_key_via_api(key_event);
             }
             Mode::KeybindHelp => {
                 input::handle_keybind_help_key(&mut self.state, key_event);
@@ -2472,6 +2505,31 @@ mod tests {
     }
 
     #[test]
+    fn reload_config_updates_sidebar_collapsed_mode() {
+        let _guard = config_env_lock().lock().unwrap();
+        let path = temp_config_path("reload-config-sidebar-collapsed-mode");
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::env::set_var(crate::config::CONFIG_PATH_ENV_VAR, &path);
+
+        let mut app = test_app();
+        assert_eq!(
+            app.state.sidebar_collapsed_mode,
+            crate::config::SidebarCollapsedModeConfig::Compact
+        );
+
+        std::fs::write(&path, "[ui]\nsidebar_collapsed_mode = \"hidden\"\n").unwrap();
+        let report = app.reload_config();
+        assert_eq!(report.status, crate::config::ConfigReloadStatus::Applied);
+        assert_eq!(
+            app.state.sidebar_collapsed_mode,
+            crate::config::SidebarCollapsedModeConfig::Hidden
+        );
+
+        std::env::remove_var(crate::config::CONFIG_PATH_ENV_VAR);
+        let _ = std::fs::remove_dir_all(path.parent().unwrap());
+    }
+
+    #[test]
     fn reload_config_updates_sidebar_bounds_and_reclamps() {
         let _guard = config_env_lock().lock().unwrap();
         let path = temp_config_path("reload-config-sidebar-bounds");
@@ -2613,7 +2671,7 @@ mod tests {
     }
 
     #[test]
-    fn reload_config_keeps_current_keybinds_on_invalid_binding_but_applies_other_sections() {
+    fn reload_config_disables_invalid_binding_but_applies_valid_keymap_and_other_sections() {
         let _guard = config_env_lock().lock().unwrap();
         let path = temp_config_path("reload-config-invalid-keybind");
         std::fs::create_dir_all(path.parent().unwrap()).unwrap();
@@ -2626,7 +2684,6 @@ mod tests {
 
         let mut app = test_app();
         let original_prefix = (app.state.prefix_code, app.state.prefix_mods);
-        let original_keybinds = app.state.keybinds.new_workspace.clone();
         let report = app.reload_config();
 
         assert_eq!(report.status, crate::config::ConfigReloadStatus::Partial);
@@ -2634,7 +2691,7 @@ mod tests {
             (app.state.prefix_code, app.state.prefix_mods),
             original_prefix
         );
-        assert_eq!(app.state.keybinds.new_workspace, original_keybinds);
+        assert!(app.state.keybinds.new_workspace.bindings.is_empty());
         assert_eq!(
             app.state.toast_config.delivery,
             crate::config::ToastDelivery::Terminal
@@ -2644,8 +2701,38 @@ mod tests {
             .config_diagnostic
             .as_deref()
             .is_some_and(|message| {
-                message.contains("keys.new_workspace") && message.contains("kept current keybinds")
+                message.contains("keys.new_workspace") && message.contains("disabling binding")
             }));
+
+        std::env::remove_var(crate::config::CONFIG_PATH_ENV_VAR);
+        let _ = std::fs::remove_dir_all(path.parent().unwrap());
+    }
+
+    #[test]
+    fn reload_config_user_binding_displaces_default_without_rejecting_prefix() {
+        let _guard = config_env_lock().lock().unwrap();
+        let path = temp_config_path("reload-config-user-binding-displaces-default");
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(
+            &path,
+            "[keys]\nprefix = \"ctrl+space\"\nprevious_workspace = \"prefix+shift+l\"\n",
+        )
+        .unwrap();
+        std::env::set_var(crate::config::CONFIG_PATH_ENV_VAR, &path);
+
+        let mut app = test_app();
+        let report = app.reload_config();
+
+        assert_eq!(report.status, crate::config::ConfigReloadStatus::Applied);
+        assert_eq!(app.state.prefix_code, KeyCode::Char(' '));
+        assert_eq!(app.state.prefix_mods, KeyModifiers::CONTROL);
+        assert!(app
+            .state
+            .keybinds
+            .previous_workspace
+            .matches_prefix(&KeyEvent::new(KeyCode::Char('l'), KeyModifiers::SHIFT)));
+        assert!(app.state.keybinds.swap_pane_right.bindings.is_empty());
+        assert!(app.state.config_diagnostic.is_none());
 
         std::env::remove_var(crate::config::CONFIG_PATH_ENV_VAR);
         let _ = std::fs::remove_dir_all(path.parent().unwrap());
@@ -4300,6 +4387,47 @@ last_pane = "prefix+tab"
 
         assert_eq!(app.state.name_input, "feature/logs");
         assert!(!app.state.name_input_replace_on_type);
+    }
+
+    #[test]
+    fn route_client_input_rename_enter_submits_through_api_path() {
+        let mut app = test_app();
+        app.state.workspaces = vec![Workspace::test_new("old")];
+        app.state.active = Some(0);
+        app.state.selected = 0;
+        app.state.mode = Mode::RenameWorkspace;
+        app.state.name_input = "new".into();
+
+        app.route_client_input(b"\r".to_vec());
+
+        assert_eq!(app.state.workspaces[0].custom_name.as_deref(), Some("new"));
+        assert!(app.event_hub.events_after(0).iter().any(|(_, event)| {
+            matches!(event.event, crate::api::schema::EventKind::WorkspaceRenamed)
+        }));
+    }
+
+    #[test]
+    fn route_client_input_context_menu_enter_submits_through_api_path() {
+        let mut app = test_app();
+        app.state.workspaces = vec![Workspace::test_new("a"), Workspace::test_new("b")];
+        app.state.active = Some(0);
+        app.state.selected = 0;
+        app.state.confirm_close = false;
+        app.state.context_menu = Some(state::ContextMenuState {
+            kind: state::ContextMenuKind::Workspace { ws_idx: 1 },
+            x: 2,
+            y: 2,
+            list: state::MenuListState::new(1),
+        });
+        app.state.mode = Mode::ContextMenu;
+
+        app.route_client_input(b"\r".to_vec());
+
+        assert_eq!(app.state.workspaces.len(), 1);
+        assert_eq!(app.state.workspaces[0].display_name(), "a");
+        assert!(app.event_hub.events_after(0).iter().any(|(_, event)| {
+            matches!(event.event, crate::api::schema::EventKind::WorkspaceClosed)
+        }));
     }
 
     #[test]

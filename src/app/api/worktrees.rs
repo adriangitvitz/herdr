@@ -611,6 +611,7 @@ impl App {
         });
     }
 
+    #[cfg(test)]
     pub(crate) fn emit_worktree_opened_for_workspace(&mut self, ws_idx: usize, already_open: bool) {
         let Some(worktree) = self.worktree_info_for_workspace(ws_idx) else {
             return;
@@ -1038,10 +1039,10 @@ mod tests {
         let _ = std::fs::remove_dir_all(plugin_root);
     }
 
-    #[test]
-    fn deferred_api_worktree_create_failure_clears_pending_checkout() {
-        let repo = create_committed_repo("api-worktree-create-failure-repo");
-        let worktree_root = unique_temp_path("api-worktree-create-failure-root");
+    #[tokio::test]
+    async fn deferred_api_worktree_create_checks_out_existing_branch() {
+        let repo = create_committed_repo("api-worktree-create-existing-branch-repo");
+        let worktree_root = unique_temp_path("api-worktree-create-existing-branch-root");
         let branch = "foo";
         run_git(&repo, &["branch", branch]);
         let mut app = test_app();
@@ -1060,6 +1061,71 @@ mod tests {
             }),
         };
 
+        let (response_tx, response_rx) = response_channel();
+        assert!(app.handle_deferred_worktree_api_request(request(), response_tx));
+        let event = wait_for_app_event(&mut app);
+        app.handle_internal_event(event);
+        let response = response_rx
+            .recv_timeout(std::time::Duration::from_secs(2))
+            .expect("create should respond");
+        let success: SuccessResponse = serde_json::from_str(&response).unwrap();
+        let ResponseResult::WorktreeCreated { worktree, .. } = success.result else {
+            panic!("expected worktree_created response");
+        };
+        assert_eq!(worktree.branch.as_deref(), Some(branch));
+        let checkout = Path::new(&worktree.path);
+        assert!(checkout.join("README.md").exists());
+        let branch_name = std::process::Command::new("git")
+            .arg("-C")
+            .arg(checkout)
+            .args(["branch", "--show-current"])
+            .output()
+            .unwrap();
+        assert!(branch_name.status.success());
+        assert_eq!(
+            String::from_utf8(branch_name.stdout).unwrap().trim(),
+            branch
+        );
+        assert!(app.pending_api_worktree_creates.is_empty());
+
+        for (_, runtime) in app.terminal_runtimes.drain() {
+            runtime.shutdown();
+        }
+        let _ = std::fs::remove_dir_all(worktree_root);
+        let _ = std::fs::remove_dir_all(repo);
+    }
+
+    #[test]
+    fn deferred_api_worktree_create_failure_clears_pending_checkout() {
+        let repo = create_committed_repo("api-worktree-create-failure-repo");
+        let worktree_root = unique_temp_path("api-worktree-create-failure-root");
+        let branch_name = std::process::Command::new("git")
+            .arg("-C")
+            .arg(&repo)
+            .args(["branch", "--show-current"])
+            .output()
+            .unwrap();
+        assert!(branch_name.status.success());
+        let branch = String::from_utf8(branch_name.stdout)
+            .unwrap()
+            .trim()
+            .to_string();
+        let mut app = test_app();
+        let mut parent = Workspace::test_new("main");
+        parent.identity_cwd = repo.clone();
+        let parent_id = parent.id.clone();
+        app.state.workspaces = vec![parent];
+        app.state.ensure_test_terminals();
+        app.state.worktree_directory = worktree_root.clone();
+        let request = || Request {
+            id: "req".into(),
+            method: crate::api::schema::Method::WorktreeCreate(WorktreeCreateParams {
+                workspace_id: Some(parent_id.clone()),
+                branch: Some(branch.clone()),
+                ..WorktreeCreateParams::default()
+            }),
+        };
+
         let (first_tx, first_rx) = response_channel();
         assert!(app.handle_deferred_worktree_api_request(request(), first_tx));
         let event = wait_for_app_event(&mut app);
@@ -1069,10 +1135,6 @@ mod tests {
             .expect("failed create should respond");
         let error: ErrorResponse = serde_json::from_str(&response).unwrap();
         assert_eq!(error.error.code, "worktree_create_failed");
-        assert!(error
-            .error
-            .message
-            .contains("fatal: a branch named 'foo' already exists"));
         assert!(app.pending_api_worktree_creates.is_empty());
 
         let (second_tx, second_rx) = response_channel();

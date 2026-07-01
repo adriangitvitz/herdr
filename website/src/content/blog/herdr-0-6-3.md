@@ -1,9 +1,8 @@
 ---
-title: "session persistence, safer updates, and workspace navigation"
-version: "0.6.3"
-path: "0.6.3/session-persistence-safer-updates-and-workspace-navigation"
+title: "Herdr 0.6.3: session persistence, safer updates, and workspace navigation"
 description: "This one adds new persistence paths for updates, server restarts, and larger sessions."
 date: 2026-05-27
+draft: false
 ---
 
 ## Persistence for the hard parts

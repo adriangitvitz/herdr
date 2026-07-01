@@ -212,7 +212,7 @@ fn windows_event_is_control_key(event: &crossterm::event::Event) -> bool {
     )
 }
 
-#[cfg(windows)]
+#[cfg(any(windows, test))]
 fn windows_key_raw_bytes(
     event: &crossterm::event::Event,
     raw_sequence_pending: bool,
@@ -228,6 +228,9 @@ fn windows_key_raw_bytes(
 
     match key.code {
         KeyCode::Esc if key.modifiers.is_empty() => Some(vec![0x1b]),
+        KeyCode::Char('[') if !raw_sequence_pending && key.modifiers == KeyModifiers::CONTROL => {
+            Some(vec![0x1b])
+        }
         KeyCode::Char(ch)
             if !raw_sequence_pending
                 && matches!(ch, 'i' | 'I')
@@ -365,7 +368,7 @@ mod tests {
     }
 }
 
-#[cfg(all(test, windows))]
+#[cfg(test)]
 mod windows_tests {
     use super::*;
     use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
@@ -395,6 +398,42 @@ mod windows_tests {
         );
     }
 
+    #[test]
+    fn windows_ctrl_bracket_starts_raw_escape_sequence() {
+        let ctrl_bracket = Event::Key(KeyEvent::new(KeyCode::Char('['), KeyModifiers::CONTROL));
+        assert_eq!(
+            windows_key_raw_bytes(&ctrl_bracket, false).as_deref(),
+            Some(b"\x1b".as_slice())
+        );
+
+        let mut framer = crate::raw_input::RawInputFramer::default();
+        assert!(framer.push(b"\x1b").is_empty());
+        let events = framer.push(b"[<35;48;26M");
+        assert_eq!(events.len(), 1);
+
+        let event = windows_client_input_event_from_raw(events.into_iter().next().unwrap())
+            .expect("raw mouse converts");
+        assert!(matches!(
+            event,
+            crate::protocol::ClientInputEvent::Mouse {
+                kind: crate::protocol::ClientMouseKind::Moved,
+                column: 47,
+                row: 25,
+                modifiers: _,
+            }
+        ));
+    }
+
+    #[test]
+    fn windows_ctrl_shift_bracket_stays_semantic() {
+        let ctrl_shift_bracket = Event::Key(KeyEvent::new(
+            KeyCode::Char('['),
+            KeyModifiers::CONTROL | KeyModifiers::SHIFT,
+        ));
+        assert_eq!(windows_key_raw_bytes(&ctrl_shift_bracket, false), None);
+    }
+
+    #[cfg(windows)]
     #[test]
     fn windows_ctrl_d_semantic_event_encodes_to_eot() {
         let event = Event::Key(KeyEvent::new(KeyCode::Char('d'), KeyModifiers::CONTROL));

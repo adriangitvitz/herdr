@@ -159,12 +159,6 @@ impl App {
         self.pending_api_worktree_creates
             .insert(checkout_key.clone(), operation_id);
 
-        let command = crate::worktree::build_worktree_add_new_branch_command(
-            &source.source_checkout_path,
-            &checkout_path,
-            &branch,
-            &base,
-        );
         let parent_dir = checkout_path.parent().map(Path::to_path_buf);
         let source_workspace_id = source
             .workspace_idx
@@ -191,15 +185,22 @@ impl App {
             respond_to,
         };
         let path = checkout_path;
+        let source_checkout_path = api_request.source_checkout_path.clone();
         let event_tx = self.event_tx.clone();
         std::thread::spawn(move || {
             let result = if let Some(parent_dir) = parent_dir {
-                std::fs::create_dir_all(&parent_dir)
-                    .map_err(|err| err.to_string())
-                    .and_then(|()| crate::worktree::run_worktree_command(&command))
+                std::fs::create_dir_all(&parent_dir).map_err(|err| err.to_string())
             } else {
-                crate::worktree::run_worktree_command(&command)
-            };
+                Ok(())
+            }
+            .and_then(|()| {
+                crate::worktree::run_worktree_add_command(
+                    &source_checkout_path,
+                    &path,
+                    &branch,
+                    &base,
+                )
+            });
             let _ = event_tx.blocking_send(AppEvent::WorktreeAddFinished(Box::new(
                 crate::events::WorktreeAddResult {
                     path,
@@ -365,6 +366,12 @@ impl App {
         self.pending_api_worktree_creates.remove(&checkout_key);
 
         if let Err(err) = result.result {
+            if let Some(create) = &mut self.state.worktree_create {
+                if create.checkout_path == result.path {
+                    create.creating = false;
+                    create.error = Some(err.clone());
+                }
+            }
             Self::send_api_response(
                 api.respond_to,
                 encode_error(api.id, "worktree_create_failed", err),
@@ -419,6 +426,17 @@ impl App {
             if let Some(ws) = self.state.workspaces.get_mut(ws_idx) {
                 ws.set_custom_name(label);
             }
+        }
+        if self
+            .state
+            .worktree_create
+            .as_ref()
+            .is_some_and(|create| create.checkout_path == result.path)
+        {
+            self.state.worktree_create = None;
+            self.state.name_input.clear();
+            self.state.name_input_replace_on_type = false;
+            self.state.mode = crate::app::Mode::Terminal;
         }
         self.state.mark_session_dirty();
         if created_workspace {
@@ -491,6 +509,17 @@ impl App {
                 } else {
                     "worktree_remove_failed"
                 };
+            if let Some(remove) = &mut self.state.worktree_remove {
+                if remove.workspace_id == result.workspace_id && remove.path == result.path {
+                    remove.removing = false;
+                    if code == "dirty_worktree_requires_force" && !remove.force_confirmation {
+                        remove.force_confirmation = true;
+                        remove.error = None;
+                    } else {
+                        remove.error = Some(message.clone());
+                    }
+                }
+            }
             Self::send_api_response(api.respond_to, encode_error(api.id, code, message));
             return;
         }
@@ -553,6 +582,16 @@ impl App {
             worktree,
             result.forced,
         );
+        if self.state.worktree_remove.as_ref().is_some_and(|remove| {
+            remove.workspace_id == result.workspace_id && remove.path == result.path
+        }) {
+            self.state.worktree_remove = None;
+            self.state.mode = if self.state.active.is_some() {
+                crate::app::Mode::Terminal
+            } else {
+                crate::app::Mode::Navigate
+            };
+        }
         let response = encode_success(
             api.id,
             ResponseResult::WorktreeRemoved {

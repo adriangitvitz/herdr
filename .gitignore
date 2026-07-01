@@ -18,3 +18,6 @@ __pycache__/
 /.pi/cache
 /result
 /result-*
+
+/.wrangler/
+**/.wrangler/

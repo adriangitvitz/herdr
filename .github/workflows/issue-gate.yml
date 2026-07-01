@@ -32,6 +32,7 @@ jobs:
             ];
             const requiredEnvironmentFields = [
               /^\s*(?:-\s*)?Herdr version:[^\S\r\n]*\S.*$/m,
+              /^\s*(?:-\s*)?Update channel(?: \([^)]+\))?:[^\S\r\n]*\S.*$/im,
               /^\s*(?:-\s*)?Operating system:[^\S\r\n]*\S.*$/m,
               /^\s*(?:-\s*)?Terminal:[^\S\r\n]*\S.*$/m,
             ];
@@ -66,6 +67,20 @@ jobs:
               return typeof section === 'string' && section.trim().length > 0;
             }
 
+            function bodyWithoutFencedCodeBlocks(value) {
+              let inFence = false;
+              return value
+                .split(/\r?\n/)
+                .filter((line) => {
+                  if (/^\s{0,3}(```|~~~)/.test(line)) {
+                    inFence = !inFence;
+                    return false;
+                  }
+                  return !inFence;
+                })
+                .join('\n');
+            }
+
             async function getPermission(username) {
               try {
                 const { data: permissionLevel } = await github.rest.repos.getCollaboratorPermissionLevel({
@@ -95,6 +110,10 @@ jobs:
             const body = issue.body || '';
             const hasBugConfirmation = bugConfirmationPattern.test(body);
             const hasBugTemplate = requiredSections.every((section) => body.includes(section));
+            const allowedHeadings = new Set(requiredSections);
+            const headingBody = bodyWithoutFencedCodeBlocks(body);
+            const headings = [...headingBody.matchAll(/^\s{0,3}#{1,6}\s+(.+?)\s*$/gm)].map((match) => match[0].trim());
+            const extraHeadings = headings.filter((heading) => !allowedHeadings.has(heading));
             const currentBehavior = extractSection(body, '### Current behavior');
             const expectedBehavior = extractSection(body, '### Expected behavior');
             const reproduction = extractSection(body, '### Reproduction');
@@ -107,6 +126,38 @@ jobs:
               impact,
             ].every(hasContent);
             const hasEnvironmentFields = hasContent(environment) && requiredEnvironmentFields.every((pattern) => pattern.test(environment));
+            if (hasBugConfirmation && hasBugTemplate && extraHeadings.length > 0) {
+              const message = [
+                `hi @${author}, thanks for opening this.`,
+                '',
+                'this issue uses extra markdown headings outside the bug report template.',
+                '',
+                'please use the exact template sections only. bug reports should describe observed behavior, exact reproduction steps, impact, and environment. extra root-cause analysis, proposed fixes, implementation plans, or generated diagnosis make reports harder to triage.',
+                ...(hasEnvironmentFields ? [] : [
+                  '',
+                  'this report is also missing required environment details: herdr version, update channel, operating system, and terminal.',
+                ]),
+                '',
+                'closing this so the issue tracker stays limited to concise, actionable bug reports.',
+              ].join('\n');
+
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                body: message,
+              });
+
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issue.number,
+                state: 'closed',
+                state_reason: 'not_planned',
+              });
+              return;
+            }
+
             if (hasBugConfirmation && hasBugTemplate && hasRequiredContent && hasEnvironmentFields) {
               console.log(`#${issue.number} matches the bug report template`);
               return;
@@ -116,7 +167,7 @@ jobs:
               const message = [
                 `hi @${author}, thanks for opening this.`,
                 '',
-                'this bug report is missing required environment details. please edit the issue and fill in herdr version, operating system, and terminal.',
+                'this bug report is missing required environment details. please edit the issue and fill in herdr version, update channel, operating system, and terminal.',
                 '',
                 'shell and relevant config are optional, but they help when they affect the bug.',
               ].join('\n');
@@ -137,7 +188,7 @@ jobs:
               '',
               'this issue does not appear to use the full bug report template. herdr issues are only for reproducible bugs and maintainer-created or maintainer-converted work items.',
               '',
-              'bug reports must include the reproducible-bug confirmation, current behavior, expected behavior, reproduction, impact, and environment fields with herdr version, operating system, and terminal.',
+              'bug reports must include the reproducible-bug confirmation, current behavior, expected behavior, reproduction, impact, and environment fields with herdr version, update channel, operating system, and terminal.',
               '',
               'feature requests, ideas, questions, contribution proposals, and direction checks belong in discussions:',
               `https://github.com/${context.repo.owner}/${context.repo.repo}/discussions`,

@@ -927,7 +927,7 @@ samp {
 }
 
 .hero-lede {
-    max-width: 520px;
+    max-width: 560px;
     margin: 1.25rem 0 0;
     color: var(--ink-soft);
     font-size: clamp(1rem, 1.8vw, 1.2rem);
@@ -1467,7 +1467,7 @@ samp {
 .logo-cloud {
     max-width: var(--max);
     margin: 0 auto;
-    padding: 0 1.25rem 4rem;
+    padding: 2.5rem 1.25rem 3rem;
     overflow: hidden;
 }
 
@@ -1571,19 +1571,10 @@ samp {
     }
 }
 
-.section,
-.awareness-section {
+.section {
     padding-top: 5rem;
     padding-bottom: 5rem;
     border-top: 1px solid var(--line);
-}
-
-.intro-section {
-    padding-top: 2.5rem;
-}
-
-.intro-section .section-heading-wide h2 {
-    max-width: 760px;
 }
 
 .contrast-grid {
@@ -1625,8 +1616,6 @@ samp {
 
 .section-heading h2,
 .section-heading-wide h2,
-.feature-copy h2,
-.api-copy h2,
 .final-cta h2 {
     font-size: clamp(1.8rem, 4vw, 3.2rem);
     max-width: 800px;
@@ -1641,9 +1630,15 @@ samp {
     align-items: end;
 }
 
+.why-section .section-heading-wide {
+    align-items: start;
+}
+
+.why-section .section-heading-wide p {
+    margin-top: 0.5rem;
+}
+
 .section-heading-wide p,
-.feature-copy p,
-.api-copy p,
 .final-cta p {
     margin: 0;
     color: var(--muted);
@@ -1658,8 +1653,7 @@ samp {
 }
 
 .pillar-card,
-.access-card,
-.awareness-card {
+.access-card {
     border: 1px solid var(--line);
     border-radius: var(--radius-md);
     background: transparent;
@@ -1684,8 +1678,7 @@ samp {
 }
 
 .pillar-card h3,
-.access-card h3,
-.awareness-card h3 {
+.access-card h3 {
     margin: 1rem 0 0;
     color: var(--ink);
     letter-spacing: -0.02em;
@@ -1696,143 +1689,11 @@ samp {
 }
 
 .pillar-card p,
-.access-card p,
-.awareness-card p {
+.access-card p {
     margin: 0.75rem 0 0;
     color: var(--muted);
     line-height: 1.6;
     font-size: 0.95rem;
-}
-
-.feature-split,
-.api-section {
-    display: grid;
-    grid-template-columns: minmax(0, 0.86fr) minmax(0, 1.14fr);
-    gap: 2rem;
-    align-items: center;
-}
-
-.feature-copy,
-.api-copy {
-    min-width: 0;
-}
-
-.feature-copy .section-kicker,
-.api-copy .section-kicker {
-    margin-bottom: 1rem;
-}
-
-.feature-copy p,
-.api-copy p {
-    margin-top: 1.1rem;
-}
-
-.check-list {
-    list-style: none;
-    margin: 1.2rem 0 0;
-    padding: 0;
-    display: grid;
-    gap: 0.6rem;
-    color: var(--muted);
-    font-size: 0.95rem;
-}
-
-.check-list li {
-    position: relative;
-    padding-left: 1.4rem;
-}
-
-.check-list li::before {
-    content: "→";
-    position: absolute;
-    left: 0;
-    color: var(--accent);
-    font-family: var(--mono);
-    font-weight: 700;
-}
-
-.feature-mock {
-    margin: 0;
-    overflow: hidden;
-    border-radius: var(--radius-lg);
-    background: var(--term-bg);
-    border: 1px solid var(--term-border);
-    font-family: var(--mono);
-    font-size: 0.72rem;
-    line-height: 1.5;
-    color: var(--term-muted);
-    pointer-events: none;
-    user-select: none;
-    min-height: 380px;
-    display: flex;
-    flex-direction: column;
-}
-
-.feature-mock-panes {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    gap: 0.45rem;
-    padding: 0.55rem;
-    flex: 1;
-}
-
-.feature-mock .mock-pane {
-    min-width: 0;
-    overflow: hidden;
-    border: 1px solid var(--term-border);
-    background: var(--term-bg);
-    padding: 0.75rem;
-}
-
-.feature-mock .mock-pane.focused {
-    border: 2px solid var(--term-tab-active-bg);
-    padding: calc(0.75rem - 1px);
-}
-
-.feature-mock .mock-prompt {
-    margin-bottom: 0.35rem;
-    color: var(--term-prompt);
-    font-size: 1.05em;
-    font-weight: 700;
-}
-
-.feature-mock .mock-prompt em {
-    color: var(--term-dim);
-    font-style: normal;
-    font-weight: 500;
-}
-
-.feature-mock b {
-    color: var(--accent);
-}
-
-.feature-mock .cmd {
-    color: var(--term-cmd);
-}
-
-.feature-mock .str {
-    color: var(--term-str);
-}
-
-.feature-mock .dim,
-.feature-mock .time {
-    color: var(--term-dim);
-}
-
-.feature-mock .green {
-    color: var(--term-green-bright);
-}
-
-.feature-mock .red {
-    color: var(--red);
-}
-
-.feature-mock .cursor {
-    display: inline-block;
-    width: 0.4rem;
-    height: 0.85rem;
-    background: var(--term-text);
-    vertical-align: -0.14rem;
 }
 
 .access-grid {
@@ -1973,10 +1834,6 @@ samp {
     border-color: var(--accent);
 }
 
-.api-section {
-    align-items: stretch;
-}
-
 .inline-links {
     display: flex;
     flex-wrap: wrap;
@@ -2032,96 +1889,6 @@ samp {
 
 .code-card .str {
     color: var(--term-cmd);
-}
-
-.awareness-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 0.75rem;
-}
-
-.awareness-card {
-    display: flex;
-    flex-direction: column;
-    padding: 1.1rem;
-}
-
-.awareness-mock {
-    width: 100%;
-    height: 240px;
-    margin: 0;
-    overflow: hidden;
-    border-radius: var(--radius-sm);
-    background: var(--term-bg);
-    border: 1px solid var(--term-border);
-    font-family: var(--mono);
-    font-size: 0.68rem;
-    line-height: 1.4;
-    color: var(--term-muted);
-    pointer-events: none;
-    user-select: none;
-}
-
-.awareness-mock .mock-sidebar {
-    height: 100%;
-    border-right: none;
-    background: var(--term-sidebar-bg);
-}
-
-.awareness-mock .mock-sidebar-title {
-    padding: 0.6rem 0.85rem;
-    font-size: 0.72rem;
-}
-
-.awareness-mock .mock-space {
-    padding: 0.5rem 0.85rem;
-    gap: 0.5rem;
-    font-size: 0.72rem;
-}
-
-.awareness-mock .mock-agent {
-    padding: 0.4rem 0.85rem;
-    gap: 0.45rem;
-    font-size: 0.72rem;
-}
-
-.awareness-mock .mock-agent-title {
-    padding: 0.5rem 0.85rem;
-    font-size: 0.72rem;
-}
-
-.awareness-mock .mock-dot {
-    width: 0.42rem;
-    height: 0.42rem;
-    margin-top: 0.2rem;
-}
-
-.awareness-mock .mock-sidebar-spacer {
-    min-height: 2rem;
-}
-
-.awareness-card p {
-    margin-top: 0.75rem;
-}
-
-.state-legend {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.6rem;
-    margin-top: 1rem;
-}
-
-.state-legend span {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    border: 1px solid var(--line);
-    border-radius: var(--radius-sm);
-    background: transparent;
-    color: var(--muted);
-    padding: 0.4rem 0.65rem;
-    font-size: 0.82rem;
-    font-family: var(--mono);
 }
 
 .table-wrap {
@@ -2554,8 +2321,6 @@ td:last-child {
         max-width: 720px;
     }
 
-    .feature-split,
-    .api-section,
     .section-heading-wide {
         grid-template-columns: 1fr;
     }
@@ -2610,7 +2375,6 @@ td:last-child {
     }
 
     .section,
-    .awareness-section,
     .demo-section,
     .logo-cloud,
     .footer,
@@ -2670,16 +2434,13 @@ td:last-child {
         max-width: 92px;
     }
 
-    .section,
-    .awareness-section {
+    .section {
         padding-top: 3rem;
         padding-bottom: 3rem;
     }
 
     .section-heading h2,
     .section-heading-wide h2,
-    .feature-copy h2,
-    .api-copy h2,
     .final-cta h2 {
         font-size: clamp(1.6rem, 10vw, 2.4rem);
     }
@@ -2687,7 +2448,6 @@ td:last-child {
     .pillar-grid,
     .contrast-grid,
     .access-grid,
-    .awareness-grid,
     .differ-list {
         grid-template-columns: 1fr;
     }
@@ -3301,6 +3061,75 @@ td:last-child {
     overflow-wrap: anywhere;
 }
 
+.author-card {
+    display: flex;
+    align-items: center;
+    gap: 1.1rem;
+    margin-top: 3.5rem;
+    padding: 1.4rem 1.5rem;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-lg);
+    background: color-mix(in srgb, var(--bg-elevated) 60%, transparent);
+}
+
+.author-photo {
+    flex: none;
+    width: 72px;
+    height: 72px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 1px solid var(--line);
+}
+
+.author-body {
+    min-width: 0;
+}
+
+.author-name {
+    margin: 0;
+    color: var(--ink);
+    font-size: 1.05rem;
+    font-weight: 800;
+    letter-spacing: -0.01em;
+}
+
+.author-role {
+    margin: 0.1rem 0 0;
+    color: color-mix(in srgb, var(--ink) 56%, var(--muted));
+    font-family: var(--mono);
+    font-size: 0.8rem;
+}
+
+.author-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.55rem;
+    margin-top: 0.8rem;
+}
+
+.author-links a {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.35rem 0.7rem;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-md);
+    color: color-mix(in srgb, var(--ink) 78%, var(--muted));
+    font-size: 0.82rem;
+    font-weight: 700;
+    text-decoration: none;
+    transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.author-links a:hover {
+    color: var(--accent);
+    border-color: color-mix(in srgb, var(--accent) 60%, var(--line));
+}
+
+.author-links svg {
+    flex: none;
+}
+
 @media (max-width: 1040px) {
     .article-layout {
         display: block;
@@ -3524,5 +3353,129 @@ td:last-child {
     .mock-view.active .mock-tabs,
     .mock-view.active .mock-pane {
         animation: none;
+    }
+}
+
+/* Homepage marketplace teaser */
+.marketplace-teaser {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 3rem;
+    align-items: center;
+    padding-block: 4.5rem;
+    border-bottom: 1px solid var(--line);
+}
+
+.marketplace-teaser-copy h2 {
+    margin: 0;
+    color: var(--ink);
+    font-family: var(--mono);
+    font-weight: 400;
+    letter-spacing: -0.04em;
+    line-height: 1.05;
+    font-size: clamp(1.9rem, 3.4vw, 2.8rem);
+}
+
+.marketplace-teaser-lede {
+    max-width: 30rem;
+    margin: 1.1rem 0 0;
+    color: var(--ink-soft);
+    font-size: clamp(1rem, 1.6vw, 1.12rem);
+    line-height: 1.6;
+}
+
+.marketplace-teaser-grid {
+    display: grid;
+    gap: 0.75rem;
+}
+
+.mp-chip {
+    display: grid;
+    gap: 0.3rem;
+    padding: 1rem 1.1rem;
+    background: var(--bg-elevated);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-md);
+    text-decoration: none;
+    transition: border-color 0.12s ease, transform 0.12s ease;
+}
+
+.mp-chip:hover {
+    border-color: var(--accent);
+    transform: translateX(2px);
+}
+
+.mp-chip-name {
+    color: var(--ink);
+    font-family: var(--mono);
+    font-size: 0.9rem;
+    font-weight: 600;
+}
+
+.mp-chip-desc {
+    color: var(--ink-soft);
+    font-size: 0.85rem;
+    line-height: 1.45;
+}
+
+.mp-chip-meta {
+    color: var(--muted);
+    font-family: var(--mono);
+    font-size: 0.75rem;
+}
+
+@media (max-width: 50rem) {
+    .marketplace-teaser {
+        grid-template-columns: 1fr;
+        gap: 2rem;
+        padding-block: 3.5rem;
+    }
+}
+
+/* What you get: balanced capability grid + code card */
+.capability-section .section-heading-wide {
+    align-items: end;
+}
+
+.capability-body {
+    display: grid;
+    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+    gap: 2rem;
+    align-items: start;
+    margin-top: 2.25rem;
+}
+
+.capability-cards {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.75rem;
+}
+
+.capability-cards article {
+    padding: 1.1rem 1.2rem;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-md);
+    background: var(--bg-elevated);
+}
+
+.capability-cards h3 {
+    margin: 0;
+    color: var(--ink);
+    font-family: var(--mono);
+    font-weight: 600;
+    font-size: 0.92rem;
+}
+
+.capability-cards p {
+    margin: 0.5rem 0 0;
+    color: var(--ink-soft);
+    font-size: 0.85rem;
+    line-height: 1.5;
+}
+
+@media (max-width: 50rem) {
+    .capability-body {
+        grid-template-columns: 1fr;
+        gap: 1.5rem;
     }
 }

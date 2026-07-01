@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
 use crate::api::schema::{EventData, EventEnvelope, EventKind};
+#[cfg(test)]
 use tracing::error;
 
 use super::{
@@ -57,6 +58,7 @@ impl App {
     }
 
     /// Create a workspace with a real PTY (needs event_tx).
+    #[cfg(test)]
     pub(crate) fn create_workspace(&mut self) {
         let follow_cwd = self
             .workspace_creation_source()
@@ -68,6 +70,7 @@ impl App {
         }
     }
 
+    #[cfg(test)]
     pub(crate) fn create_tab(&mut self) {
         let custom_name = self.state.requested_new_tab_name.take();
         let active_before = self.state.active;
@@ -109,6 +112,7 @@ impl App {
         }
     }
 
+    #[cfg(test)]
     pub(super) fn create_tab_with_options(
         &mut self,
         initial_cwd: PathBuf,
@@ -154,6 +158,7 @@ impl App {
         self.create_workspace_with_launch_env(initial_cwd, focus, Vec::new())
     }
 
+    #[cfg(test)]
     pub(crate) fn create_workspace_with_events(
         &mut self,
         initial_cwd: PathBuf,

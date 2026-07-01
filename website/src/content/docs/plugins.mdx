@@ -304,10 +304,11 @@ state should own their files or database.
 
 ## Marketplace
 
-A plugin marketplace is coming. Plugins are already shareable today: publish a
-GitHub repository with `herdr-plugin.toml`, then share
-`herdr plugin install owner/repo[/subdir]`.
+Community plugins are discoverable in the [marketplace](/plugins/), an automatic
+index of public GitHub repositories tagged with the topic `herdr-plugin`.
+Plugins stay ordinary GitHub repositories: publish one with `herdr-plugin.toml`,
+then share `herdr plugin install owner/repo[/subdir]`.
 
-If you want the plugin to appear in the website marketplace when discovery
-launches, add the GitHub topic `herdr-plugin` to the repository now. See
-[Marketplace](/docs/marketplace/) for how publishing and discovery will work.
+To get a plugin listed, add the GitHub topic `herdr-plugin` to its public
+repository. The index refreshes every 30 minutes. See
+[Marketplace](/docs/marketplace/) for how discovery works.

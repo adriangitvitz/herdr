@@ -12,6 +12,8 @@ body:
 
         Keep this short. If it does not fit on one screen, it is too long. Write in your own voice.
 
+        Use only the sections in this template. Do not add root cause, proposed fix, analysis, implementation plan, or similar sections unless a maintainer asks.
+
   - type: checkboxes
     id: bug-confirmation
     attributes:
@@ -25,7 +27,7 @@ body:
     id: current-behavior
     attributes:
       label: Current behavior
-      description: What is happening now?
+      description: What is happening now? Describe what you observed, not a guessed cause.
     validations:
       required: true
 
@@ -41,7 +43,7 @@ body:
     id: reproduction
     attributes:
       label: Reproduction
-      description: What are the shortest steps that show the problem?
+      description: What are the shortest exact steps or commands that show the problem?
     validations:
       required: true
 

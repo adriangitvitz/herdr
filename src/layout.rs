@@ -2,7 +2,10 @@
 
 use std::cmp::Reverse;
 
-use ratatui::layout::{Direction, Rect};
+use ratatui::{
+    layout::{Direction, Rect},
+    widgets::Borders,
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct PaneId(u32);
@@ -37,6 +40,8 @@ pub struct PaneInfo {
     /// Visible scrollbar lane, when scrollback is present. `inner_rect` may still
     /// exclude a stable hidden gutter when this is `None`.
     pub scrollbar_rect: Option<Rect>,
+    /// Borders drawn around this pane after UI chrome is applied.
+    pub borders: Borders,
     pub is_focused: bool,
 }
 
@@ -201,8 +206,8 @@ impl TileLayout {
     }
 
     /// Set the ratio of a split node at the given path.
-    pub fn set_ratio_at(&mut self, path: &[bool], ratio: f32) {
-        set_ratio_at(&mut self.root, path, ratio.clamp(0.1, 0.9));
+    pub fn set_ratio_at(&mut self, path: &[bool], ratio: f32) -> bool {
+        set_ratio_at(&mut self.root, path, ratio.clamp(0.1, 0.9))
     }
 
     /// Adjust the nearest split in the given direction for the focused pane.
@@ -414,6 +419,7 @@ fn collect_panes(node: &Node, area: Rect, focus: PaneId, result: &mut Vec<PaneIn
                 // inner_rect is set during render when we know if borders are shown
                 inner_rect: area,
                 scrollbar_rect: None,
+                borders: Borders::NONE,
                 is_focused: *id == focus,
             });
         }
@@ -571,7 +577,7 @@ fn remove_pane(node: Node, target: PaneId) -> Option<Node> {
     }
 }
 
-fn set_ratio_at(node: &mut Node, path: &[bool], new_ratio: f32) {
+fn set_ratio_at(node: &mut Node, path: &[bool], new_ratio: f32) -> bool {
     if let Node::Split {
         ratio,
         first,
@@ -581,11 +587,14 @@ fn set_ratio_at(node: &mut Node, path: &[bool], new_ratio: f32) {
     {
         if path.is_empty() {
             *ratio = new_ratio;
+            true
         } else if path[0] {
-            set_ratio_at(second, &path[1..], new_ratio);
+            set_ratio_at(second, &path[1..], new_ratio)
         } else {
-            set_ratio_at(first, &path[1..], new_ratio);
+            set_ratio_at(first, &path[1..], new_ratio)
         }
+    } else {
+        false
     }
 }
 
@@ -919,6 +928,7 @@ mod tests {
             rect: Rect::new(10, 10, 10, 10),
             inner_rect: Rect::new(10, 10, 10, 10),
             scrollbar_rect: None,
+            borders: Borders::NONE,
             is_focused: true,
         };
         let small_overlap_first = PaneInfo {
@@ -926,6 +936,7 @@ mod tests {
             rect: Rect::new(0, 10, 10, 2),
             inner_rect: Rect::new(0, 10, 10, 2),
             scrollbar_rect: None,
+            borders: Borders::NONE,
             is_focused: false,
         };
         let larger_overlap_second = PaneInfo {
@@ -933,6 +944,7 @@ mod tests {
             rect: Rect::new(0, 10, 10, 8),
             inner_rect: Rect::new(0, 10, 10, 8),
             scrollbar_rect: None,
+            borders: Borders::NONE,
             is_focused: false,
         };
         let panes = vec![focused.clone(), small_overlap_first, larger_overlap_second];

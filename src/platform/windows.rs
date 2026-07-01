@@ -46,6 +46,12 @@ struct WindowsProcessEntry {
 
 pub fn raise_server_nofile_limit() {}
 
+pub fn detach_server_daemon_command(_command: &mut std::process::Command) {}
+
+pub fn current_process_is_detached_server_daemon() -> bool {
+    false
+}
+
 pub fn foreground_job(child_pid: u32) -> Option<ForegroundJob> {
     let entries = snapshot_processes();
     select_pane_foreground_job(child_pid, &entries)

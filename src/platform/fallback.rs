@@ -1,9 +1,18 @@
 use std::path::PathBuf;
+use std::process::Command;
 
 use super::{ClipboardImage, ForegroundJob, Signal};
 
 /// Unsupported platform stub.
 pub fn raise_server_nofile_limit() {}
+
+/// Unsupported platform stub.
+pub fn detach_server_daemon_command(_command: &mut Command) {}
+
+/// Unsupported platform stub.
+pub fn current_process_is_detached_server_daemon() -> bool {
+    false
+}
 
 /// Unsupported platform stub.
 pub fn foreground_job(_child_pid: u32) -> Option<ForegroundJob> {

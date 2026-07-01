@@ -3,7 +3,7 @@
 # managed by herdr; reinstalling or updating the integration overwrites this file.
 # add custom hooks beside this file instead of editing it.
 # HERDR_INTEGRATION_ID=devin
-# HERDR_INTEGRATION_VERSION=1
+# HERDR_INTEGRATION_VERSION=2
 
 set -eu
 
@@ -23,6 +23,8 @@ esac
 command -v python3 >/dev/null 2>&1 || exit 0
 
 HERDR_HOOK_INPUT_FILE="$hook_input_file" python3 - <<'PY'
+from __future__ import annotations
+
 import json
 import os
 import random
